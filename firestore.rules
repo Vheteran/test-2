@@ -1,0 +1,31 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Question 1. The tasks screen is not behind login (the paper has no login for Q1),
+    // but the server still checks the shape of what is written.
+    match /tasks/{taskId} {
+      allow read, delete: if true;
+
+      // New task: exactly the fields the app writes, valid values, server timestamp.
+      allow create: if request.resource.data.keys().hasOnly(
+                         ['title', 'moduleCode', 'priority', 'completed', 'createdAt'])
+                    && request.resource.data.title is string
+                    && request.resource.data.title.size() > 0
+                    && request.resource.data.moduleCode is string
+                    && request.resource.data.moduleCode.size() > 0
+                    && request.resource.data.priority in ['Low', 'Medium', 'High']
+                    && request.resource.data.completed == false
+                    && request.resource.data.createdAt == request.time;
+
+      // Complete / re-open: only the completed flag may change, and it must be a boolean.
+      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['completed'])
+                    && request.resource.data.completed is bool;
+    }
+
+    // Question 2. A user can only touch their own /users/{uid} document.
+    match /users/{userId} {
+      allow read, create, update, delete:
+        if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}
